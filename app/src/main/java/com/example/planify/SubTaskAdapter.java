@@ -46,12 +46,14 @@ public class SubTaskAdapter extends RecyclerView.Adapter<SubTaskAdapter.SubTaskV
 //            holder.done.setEnabled(false);
             holder.done.setColorFilter(Color.GREEN);
             holder.forward.setEnabled(false);
+            holder.forward.setVisibility(View.INVISIBLE);
             holder.forward.setColorFilter(Color.GREEN);
         } else {
             holder.done.setEnabled(true);
             holder.done.setColorFilter(Color.GRAY);
             holder.forward.setEnabled(true);
-            holder.forward.setColorFilter(Color.GRAY);
+            holder.forward.setVisibility(View.VISIBLE);
+            holder.forward.setColorFilter(Color.BLUE);
         }
     }
 
@@ -97,7 +99,7 @@ public class SubTaskAdapter extends RecyclerView.Adapter<SubTaskAdapter.SubTaskV
                         .setTitle("Mark Complete")
                         .setMessage("This task will be marked " + (subTask.isSubTaskCompleted() ? "complete." : "incomplete"))
                         .setView(dialogView)
-                        .setPositiveButton("MARK COMPLETE", (dialog, which) -> {
+                        .setPositiveButton((subTask.isSubTaskCompleted() ? "MARK INCOMPLETE" : "MARK COMPLETE"), (dialog, which) -> {
                             // Handle positive button click
                             db.updateSubTask(subTask);
                             // notify change
@@ -118,26 +120,21 @@ public class SubTaskAdapter extends RecyclerView.Adapter<SubTaskAdapter.SubTaskV
                 SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
                 boolean disableDialog = preferences.getBoolean("disable_forward_subtask_dialog", false);
                 if (disableDialog){
-                    db.updateSubTask(subTask);
-                    // notify change
-                    listener.onDataChanged(subTask.getParentTaskId());
-                    subTaskList.remove(position);
-                    subTaskList.add(position, subTask);
+                    db.rescheduleSubtask(subTask, context);
+                    listener.onEntireUpdateRequired();
                     notifyDataSetChanged();
                 } else {
                     View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_layout, null);
                     CheckBox checkBox = dialogView.findViewById(R.id.checkBox);
                     new MaterialAlertDialogBuilder(context)
                             .setTitle("Forward Task")
-                            .setMessage("The task " + subTask.getSubTaskName() + " will be rescheduled to the next available time.")
+                            .setMessage("The task " + subTask.getSubTaskName() + " will be rescheduled to the next available time where a similar course exists.")
                             .setView(dialogView)
                             .setPositiveButton("RESCHEDULE", (dialog, which) -> {
                                 // Handle positive button click
-                                db.updateSubTask(subTask);
+                                db.rescheduleSubtask(subTask,context);
                                 // notify change
-                                listener.onDataChanged(subTask.getParentTaskId());
-                                subTaskList.remove(position);
-                                subTaskList.add(position, subTask);
+                                listener.onEntireUpdateRequired();
                                 notifyDataSetChanged();
                                 if (checkBox.isChecked()) {
                                     // Save user preference for disabling notifications

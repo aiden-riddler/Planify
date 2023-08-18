@@ -8,6 +8,7 @@ public class SubTask {
     private boolean subTaskCompleted = false;
     private int parentTaskId;  // Foreign key to tasks
     private int timeRequired;
+    private int position;
 
     public SubTask() {
         // Default constructor
@@ -18,6 +19,17 @@ public class SubTask {
         this.subTaskCompleted = subTaskCompleted;
         this.parentTaskId = parentTaskId;
         this.timeRequired = timeRequired;
+    }
+
+    public SubTask deepCopy(){
+        SubTask subTask = new SubTask();
+        subTask.setId(id);
+        subTask.setSubTaskName(subTaskName);
+        subTask.setSubTaskCompleted(subTaskCompleted);
+        subTask.setParentTaskId(parentTaskId);
+        subTask.setTimeRequired(timeRequired);
+        subTask.setPosition(position);
+        return subTask;
     }
 
     // Getters and setters for all fields...
@@ -62,10 +74,18 @@ public class SubTask {
         this.timeRequired = timeRequired;
     }
 
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
+    }
+
     @NonNull
     @Override
     public String toString() {
-        return subTaskName + ", " + subTaskCompleted + ", " + parentTaskId + ", "+ timeRequired;
+        return subTaskName + ", " + subTaskCompleted + ", " + parentTaskId + ", " + "Position: " + this.position + " ," + timeRequired;
     }
 }
 

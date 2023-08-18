@@ -33,7 +33,7 @@ public class Dashboard extends Fragment{
     private TimeScaleAdapter timeScaleAdapter;
     private TaskAdapter taskAdapter;
     private DatabaseHelper db;
-    private Date currentDate;
+    private final Date[] currentDate = {new Date()};
     public Dashboard() {
         // Required empty public constructor
     }
@@ -52,7 +52,7 @@ public class Dashboard extends Fragment{
         View view = inflater.inflate(R.layout.fragment_dashboard, container, false);
 
         //initialize current date
-        currentDate = new Date();
+        currentDate[0] = new Date();
 
         // initialize views
         ImageButton next = view.findViewById(R.id.next);
@@ -60,9 +60,6 @@ public class Dashboard extends Fragment{
 
         // Find the TextView to display the formatted date
         dateTextView = view.findViewById(R.id.dateText);
-
-        // Get today's date
-        final Date[] currentDate = {new Date()};
 
         // Define the desired date format
         SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMM d yyyy", Locale.getDefault());
@@ -81,7 +78,7 @@ public class Dashboard extends Fragment{
                 Date newDate = addToDate(currentDate[0], 1);
                 currentDate[0] = newDate;
                 setDateToTextView(newDate);
-                taskAdapter.setTasks(db.getTasksOnDate(newDate));
+                taskAdapter.setTasks(db.getTasksOnDate(newDate), currentDate[0]);
             }
         });
 
@@ -91,7 +88,7 @@ public class Dashboard extends Fragment{
                 Date newDate = addToDate(currentDate[0], -1);
                 currentDate[0] = newDate;
                 setDateToTextView(newDate);
-                taskAdapter.setTasks(db.getTasksOnDate(newDate));
+                taskAdapter.setTasks(db.getTasksOnDate(newDate), currentDate[0]);
             }
         });
 
@@ -116,11 +113,11 @@ public class Dashboard extends Fragment{
 
         tasksRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
         dataViewModel = new ViewModelProvider(requireActivity()).get(DataViewModel.class);
-        taskAdapter = new TaskAdapter(getContext());
+        taskAdapter = new TaskAdapter(getContext(), currentDate[0]);
 
         // Observe LiveData (if using LiveData)
          dataViewModel.getTaskListLiveData().observe(getViewLifecycleOwner(), tasks -> {
-             taskAdapter.setTasks(tasks);
+             taskAdapter.setTasks(tasks, currentDate[0]);
          });
         tasksRecycler.setAdapter(taskAdapter);
         return view;
@@ -157,10 +154,10 @@ public class Dashboard extends Fragment{
                 (view, year, monthOfYear, dayOfMonth) -> {
                     calendar.set(year, monthOfYear, dayOfMonth);
                     Date selectedDate = calendar.getTime();
-                    currentDate = selectedDate;
+                    currentDate[0] = selectedDate;
                     setDateToTextView(selectedDate);
 //                    dataViewModel.setTaskList(db.getTasksOnDate(selectedDate));
-                    taskAdapter.setTasks(db.getTasksOnDate(selectedDate));
+                    taskAdapter.setTasks(db.getTasksOnDate(selectedDate), currentDate[0]);
                 },
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH),

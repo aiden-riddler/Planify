@@ -149,8 +149,8 @@ public class TaskFormActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 // Collect data
-                String courseName = editCourseName.getText().toString();
-                String taskName = editTaskName.getText().toString();
+                String courseName = toCamelCase(editCourseName.getText().toString());
+                String taskName = toSentenceCase(editTaskName.getText().toString());
                 List<SubTask> subTasks = collectSubTasks();
                 int year = datePicker.getYear();
                 int month = datePicker.getMonth();
@@ -184,6 +184,7 @@ public class TaskFormActivity extends AppCompatActivity {
                 c1.set(Calendar.MINUTE, endMinute);
                 c1.set(Calendar.SECOND, 0);
                 c1.set(Calendar.MILLISECOND, 0);
+
                 long endTime = c1.getTimeInMillis();
 
                 int totalTimeRequired = 0;
@@ -207,35 +208,31 @@ public class TaskFormActivity extends AppCompatActivity {
                             db.deleteSchedule(schedule.getId());
                         }
 
-                        // Do something with the collected data
-                        String message = "Start task: " + taskName;
-                        int notId = uniqueNotificationId();
-                        NotificationUtils.scheduleNotification(TaskFormActivity.this, message, startTime, notId);
-
-                        message = "Upcoming task: " + taskName;
-                        NotificationUtils.scheduleNotification(TaskFormActivity.this, message, notTime, notId);
-
                         Task task = new Task(courseName, taskName, startTime, endTime, false, 0.0, false);
                         task.setId(previousTask.getId());
                         task.setSubTasks(subTasks);
 
                         int rows = (int) db.updateTask(task);
-                        if (rows != -1){
+                        if (rows > 0){
+                            // Do something with the collected data
+                            String message = "Start task: " + taskName;
+                            int notId = uniqueNotificationId();
+                            NotificationUtils.scheduleNotification(TaskFormActivity.this, message, startTime, notId);
+
+                            message = "Upcoming task: " + taskName;
+                            NotificationUtils.scheduleNotification(TaskFormActivity.this, message, notTime, notId);
+
                             db.insertSchedule(new Schedule(task.getId(), notId));
                             Intent intent = new Intent(TaskFormActivity.this, MainActivity.class);
                             startActivity(intent);
-                        } else {
+                        } else if (rows == -1) {
                             Toast.makeText(TaskFormActivity.this, "Time selected is already occupied", Toast.LENGTH_SHORT).show();
-                            NotificationUtils.cancelNotification(TaskFormActivity.this, notId);
+
+                        } else if (rows == -2){
+                            Toast.makeText(TaskFormActivity.this, "Cannot schedule task at time selected.", Toast.LENGTH_SHORT).show();
                         }
                     } else {
                         // Do something with the collected data
-                        String message = "Start task: " + taskName;
-                        int notId = uniqueNotificationId();
-                        NotificationUtils.scheduleNotification(TaskFormActivity.this, message, startTime, notId);
-
-                        message = "Upcoming task: " + taskName;
-                        NotificationUtils.scheduleNotification(TaskFormActivity.this, message, notTime, notId);
 
                         Task task = new Task(courseName, taskName, startTime, endTime, false, 0.0, false);
                         task.setSubTasks(subTasks);
@@ -243,13 +240,21 @@ public class TaskFormActivity extends AppCompatActivity {
                         for(SubTask subTask:subTasks)
                             Log.d("Planify", " Added subtasks: " + subTask.toString());
                         int taskId = (int) db.insertTask(task);
-                        if (taskId != -1){
+                        if (taskId > 0){
+                            String message = "Start task: " + taskName;
+                            int notId = uniqueNotificationId();
+                            NotificationUtils.scheduleNotification(TaskFormActivity.this, message, startTime, notId);
+
+                            message = "Upcoming task: " + taskName;
+                            NotificationUtils.scheduleNotification(TaskFormActivity.this, message, notTime, notId);
+
                             db.insertSchedule(new Schedule(taskId, notId));
                             Intent intent = new Intent(TaskFormActivity.this, MainActivity.class);
                             startActivity(intent);
-                        } else {
+                        } else if (taskId == -1) {
                             Toast.makeText(TaskFormActivity.this, "Time selected is already occupied", Toast.LENGTH_SHORT).show();
-                            NotificationUtils.cancelNotification(TaskFormActivity.this, notId);
+                        } else if (taskId == -2){
+                            Toast.makeText(TaskFormActivity.this, "Cannot schedule task at time selected.", Toast.LENGTH_SHORT).show();
                         }
                     }
                 }
@@ -264,6 +269,25 @@ public class TaskFormActivity extends AppCompatActivity {
         int remainingSeconds = seconds % 60;
 //        String.format("%02d:%02d:%02d", hours, minutes, remainingSeconds)
         return new int[]{hours, minutes, remainingSeconds};
+    }
+
+    private String toSentenceCase(String sentence){
+        return sentence.substring(0, 1).toUpperCase() + sentence.substring(1).toLowerCase();
+    }
+
+    private String toCamelCase(String sentence){
+        String[] words = sentence.split(" ");
+        StringBuilder capitalized = new StringBuilder();
+
+        for (String word : words) {
+            if (!word.isEmpty()) {
+                capitalized.append(word.substring(0, 1).toUpperCase())
+                        .append(word.substring(1).toLowerCase())
+                        .append(" ");
+            }
+        }
+
+        return capitalized.toString().trim();
     }
 
     private static int uniqueNotificationId() {
@@ -288,6 +312,7 @@ public class TaskFormActivity extends AppCompatActivity {
         SubTask subTask1 = new SubTask();
         subTask1.setSubTaskName(subTask1Name);
         subTask1.setTimeRequired(subTask1timeReq);
+        subTask1.setPosition(1);
         if (isUpdate) {
             if (previousTask.getSubTasks().size() > 0)
                 subTask1.setId(previousTask.getSubTasks().get(0).getId());
@@ -303,17 +328,20 @@ public class TaskFormActivity extends AppCompatActivity {
             int subTaskSec = Integer.parseInt(((EditText) findViewById(400+counterCopy)).getText().toString().isEmpty() ? "0" : ((EditText) findViewById(400+counterCopy)).getText().toString());
             int timeReq = (subTaskHr * 60 * 60) + (subTaskMin * 60) + (subTaskSec);
             counterCopy--;
+
             if (subTaskName.isEmpty() || timeReq == 0)
                 continue;
             SubTask subTask = new SubTask();
             subTask.setSubTaskName(subTaskName);
             subTask.setTimeRequired(timeReq);
+
             if (isUpdate){
                 List<SubTask> previousSubTasks = previousTask.getSubTasks();
                 if (counter < previousSubTasks.size()){
                     subTask.setId(previousSubTasks.get(counter).getId());
                 }
             }
+            subTask.setPosition(counter + 2);
             subTasks.add(subTask);
             counter++;
         }

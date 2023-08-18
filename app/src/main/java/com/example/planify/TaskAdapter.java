@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -36,10 +37,16 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
 
     private List<Task> taskList;
     private Context context;
+    private Date date;
 
-    public TaskAdapter(Context context) {
+    public TaskAdapter(Context context, Date date) {
         this.taskList = new ArrayList<>();
         this.context = context;
+        this.date = date;
+    }
+
+    public void setTaskList(List<Task> taskList) {
+        this.taskList = taskList;
     }
 
     @NonNull
@@ -78,7 +85,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
             holder.forward.setEnabled(true);
             holder.delete.setColorFilter(Color.RED);
             holder.update.setColorFilter(Color.BLUE);
-            holder.forward.setColorFilter(Color.BLUE);
+            holder.forward.setColorFilter(Color.MAGENTA);
             holder.progressBar.setProgress((int) task.getCompletionPercentage());
         }
 
@@ -117,9 +124,18 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
         }
     }
 
-    public void setTasks(List<Task> tasks) {
+    @Override
+    public void onEntireUpdateRequired() {
+        DatabaseHelper db = new DatabaseHelper(context);
+        List<Task> tasksOnDate = db.getTasksOnDate(this.date);
+        this.taskList = tasksOnDate;
+        notifyDataSetChanged();
+    }
+
+    public void setTasks(List<Task> tasks, Date date) {
         Log.d("Planify", "setting tasks " + tasks.size());
         this.taskList = tasks;
+        this.date = date;
         notifyDataSetChanged();
     }
 
@@ -172,32 +188,45 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                 intent.putExtra("TaskID", String.valueOf(task.getId()));
                 context.startActivity(intent);
             } else if (view.getId() == forward.getId()){
-                SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-                boolean disableDialog = preferences.getBoolean("disable_forward_dialog", false);
-                if (disableDialog) {
+                View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_layout_2, null);
+                CheckBox hrsCheck = dialogView.findViewById(R.id.hrsCheck);
+                CheckBox dayCheck = dialogView.findViewById(R.id.daysCheck);
+                CheckBox weeksCheck = dialogView.findViewById(R.id.weeksCheck);
+                EditText hrsEditText = dialogView.findViewById(R.id.hrsEditText);
+                EditText daysEditText = dialogView.findViewById(R.id.daysEditText);
+                EditText weeksEditText = dialogView.findViewById(R.id.weeksEditText);
+                hrsCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    hrsEditText.setEnabled(isChecked);
+                });
+                dayCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    daysEditText.setEnabled(isChecked);
+                });
+                weeksCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    weeksEditText.setEnabled(isChecked);
+                });
 
-                } else {
-                    View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_layout, null);
-                    CheckBox checkBox = dialogView.findViewById(R.id.checkBox);
-                    new MaterialAlertDialogBuilder(context)
-                            .setTitle("Reschedule task")
-                            .setMessage("This task will be rescheduled to a new time.")
-                            .setView(dialogView)
-                            .setPositiveButton("RESCHEDULE", (dialog, which) -> {
-                                // Handle positive button click
-//                                db.updateCompletedSubTask(subTask);
-                                // notify change
-                                notifyDataSetChanged();
-                                if (checkBox.isChecked()) {
-                                    // Save user preference for disabling notifications
-                                    saveNotificationPreference("disable_forward_dialog");
-                                }
-                            })
-                            .setNegativeButton("Cancel", (dialog, which) -> {
-                                // Handle negative button click
-                                dialog.cancel();
-                            }).show();
-                }
+                new MaterialAlertDialogBuilder(context)
+                        .setTitle("Reschedule task")
+                        .setMessage("This task will be rescheduled to a new time. " +
+                                "Select the extension period otherwise the task will be rescheduled to the next available time from now." +
+                                "Extension period means the task will be scheduled at a free time after the extension period.")
+                        .setView(dialogView)
+                        .setPositiveButton("RESCHEDULE", (dialog, which) -> {
+                            // Handle positive button click
+                            // get data
+                            int hrs = hrsEditText.getText().toString().isEmpty() ? 0 : Integer.parseInt(hrsEditText.getText().toString());
+                            int days = daysEditText.getText().toString().isEmpty() ? 0 : Integer.parseInt(daysEditText.getText().toString());
+                            int weeks = weeksEditText.getText().toString().isEmpty() ? 0 : Integer.parseInt(weeksEditText.getText().toString());
+
+                            db.rescheduleTask(task, context, hrs, days, weeks);
+                            // notify change
+                            setTaskList(db.getTasksOnDate(date));
+                            notifyDataSetChanged();
+                        })
+                        .setNegativeButton("Cancel", (dialog, which) -> {
+                            // Handle negative button click
+                            dialog.cancel();
+                        }).show();
             }
         }
 

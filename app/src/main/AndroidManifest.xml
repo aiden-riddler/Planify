@@ -29,6 +29,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".TaskFormActivity" android:screenOrientation="portrait"/>
+        <activity android:name=".NonSchedulerActivity" android:screenOrientation="portrait"/>
     </application>
 
 </manifest>
