@@ -1,5 +1,6 @@
 package com.example.planify;
 
+import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.fragment.app.Fragment;
@@ -9,6 +10,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 public class Archive extends Fragment {
 
@@ -33,6 +36,15 @@ public class Archive extends Fragment {
         NonSchedulerAdapter nonScheduleAdapter = new NonSchedulerAdapter(db.getNonSchedulableHours(), getContext());
         nonSchedulableHrsRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
         nonSchedulableHrsRecycler.setAdapter(nonScheduleAdapter);
+
+        FloatingActionButton addTaskFab = view.findViewById(R.id.addTaskFab);
+        addTaskFab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(getContext(), NonSchedulerActivity.class);
+                startActivity(intent);
+            }
+        });
 
         return view;
     }

@@ -105,7 +105,7 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
     // Format time to HH:mm AM/PM
     private String[] formatTime(long timeInMillis) {
         // Format the time using SimpleDateFormat or any other method you prefer
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm a", Locale.getDefault());
+        SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.getDefault());
         SimpleDateFormat sdf2 = new SimpleDateFormat("E,", Locale.getDefault());
         return new String[]{sdf.format(new Date(timeInMillis)), sdf2.format(new Date(timeInMillis))};
     }
@@ -176,6 +176,12 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder
                             // Handle positive button click
                             task.setDeleted(true);
                             db.updateTask(task);
+                            List<Schedule> schedules = db.getAllSchedulesForTask(task.getId());
+                            for (Schedule schedule:schedules){
+                                NotificationUtils.cancelNotification(context, schedule.getNotificationId());
+                                NotificationUtils.cancelNotification(context, schedule.getNotificationId());
+                                db.deleteSchedule(schedule.getId());
+                            }
                             // notify change
                             taskList.remove(getAdapterPosition());
                             notifyDataSetChanged();

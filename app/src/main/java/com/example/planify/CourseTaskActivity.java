@@ -25,13 +25,11 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
-import java.util.Locale;
 
-public class TaskFormActivity extends AppCompatActivity {
+public class CourseTaskActivity extends AppCompatActivity {
     private ImageButton addSubTask;
     private ImageButton removeSubTask;
     private int subTaskCounter = 0;
@@ -194,18 +192,18 @@ public class TaskFormActivity extends AppCompatActivity {
                 Log.d("Planify", "Subtasks size: " + subTasks.size() + " Subtask counter: " + (subTaskCounter + 1));
                 // check for empty inputs
                 if (courseName.isEmpty() || taskName.isEmpty())
-                    Toast.makeText(TaskFormActivity.this, "Fill empty fields", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CourseTaskActivity.this, "Fill empty fields", Toast.LENGTH_SHORT).show();
                 else if (subTasks.size() == 0 || (subTaskCounter + 1) > subTasks.size())
-                    Toast.makeText(TaskFormActivity.this, "Fill empty subtask fields. Time required must be greater than zero for each subtask.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CourseTaskActivity.this, "Fill empty subtask fields. Time required must be greater than zero for each subtask.", Toast.LENGTH_SHORT).show();
                 else if (totalTimeRequired > (endTime - startTime))
-                    Toast.makeText(TaskFormActivity.this, "Time provided between start-time and end-time is not enough for subtasks.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CourseTaskActivity.this, "Time provided between start-time and end-time is not enough for subtasks.", Toast.LENGTH_SHORT).show();
                 else{
                     if (isUpdate){
                         // cancel previous notifications
                         List<Schedule> schedules = db.getAllSchedulesForTask(previousTask.getId());
                         for (Schedule schedule:schedules){
-                            NotificationUtils.cancelNotification(TaskFormActivity.this, schedule.getNotificationId());
-                            NotificationUtils.cancelNotification(TaskFormActivity.this, schedule.getNotificationId());
+                            NotificationUtils.cancelNotification(CourseTaskActivity.this, schedule.getNotificationId());
+                            NotificationUtils.cancelNotification(CourseTaskActivity.this, schedule.getNotificationId());
                             db.deleteSchedule(schedule.getId());
                         }
 
@@ -218,21 +216,21 @@ public class TaskFormActivity extends AppCompatActivity {
                             // Do something with the collected data
                             String message = "Start task: " + taskName;
                             int notId = uniqueNotificationId();
-                            NotificationUtils.scheduleNotification(TaskFormActivity.this, message, startTime, notId, task.getCourse());
+                            NotificationUtils.scheduleNotification(CourseTaskActivity.this, message, startTime, notId, task.getCourse());
 
                             int notId2 = uniqueNotificationId();
                             message = "Upcoming task: " + taskName;
-                            NotificationUtils.scheduleNotification(TaskFormActivity.this, message, notTime, notId2, task.getCourse());
+                            NotificationUtils.scheduleNotification(CourseTaskActivity.this, message, notTime, notId2, task.getCourse());
 
                             db.insertSchedule(new Schedule(task.getId(), notId));
                             db.insertSchedule(new Schedule(task.getId(), notId2));
-                            Intent intent = new Intent(TaskFormActivity.this, MainActivity.class);
+                            Intent intent = new Intent(CourseTaskActivity.this, MainActivity.class);
                             startActivity(intent);
                         } else if (rows == -1) {
-                            Toast.makeText(TaskFormActivity.this, "Time selected is already occupied", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(CourseTaskActivity.this, "Time selected is already occupied", Toast.LENGTH_SHORT).show();
 
                         } else if (rows == -2){
-                            Toast.makeText(TaskFormActivity.this, "Cannot schedule task at time selected.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(CourseTaskActivity.this, "Cannot schedule task at time selected.", Toast.LENGTH_SHORT).show();
                         }
                     } else {
                         // Do something with the collected data
@@ -246,20 +244,20 @@ public class TaskFormActivity extends AppCompatActivity {
                         if (taskId > 0){
                             String message = "Start task: " + taskName;
                             int notId = uniqueNotificationId();
-                            NotificationUtils.scheduleNotification(TaskFormActivity.this, message, startTime, notId, task.getCourse());
+                            NotificationUtils.scheduleNotification(CourseTaskActivity.this, message, startTime, notId, task.getCourse());
 
                             int notId2 = uniqueNotificationId();
                             message = "Upcoming task: " + taskName;
-                            NotificationUtils.scheduleNotification(TaskFormActivity.this, message, notTime, notId2, task.getCourse());
+                            NotificationUtils.scheduleNotification(CourseTaskActivity.this, message, notTime, notId2, task.getCourse());
 
                             db.insertSchedule(new Schedule(taskId, notId));
                             db.insertSchedule(new Schedule(taskId, notId2));
-                            Intent intent = new Intent(TaskFormActivity.this, MainActivity.class);
+                            Intent intent = new Intent(CourseTaskActivity.this, MainActivity.class);
                             startActivity(intent);
                         } else if (taskId == -1) {
-                            Toast.makeText(TaskFormActivity.this, "Time selected is already occupied", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(CourseTaskActivity.this, "Time selected is already occupied", Toast.LENGTH_SHORT).show();
                         } else if (taskId == -2){
-                            Toast.makeText(TaskFormActivity.this, "Cannot schedule task at time selected.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(CourseTaskActivity.this, "Cannot schedule task at time selected.", Toast.LENGTH_SHORT).show();
                         }
                     }
                 }
@@ -621,7 +619,7 @@ public class TaskFormActivity extends AppCompatActivity {
                         }).setNegativeButton("DISCARD", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialogInterface, int i) {
-                                TaskFormActivity.super.onBackPressed();
+                                CourseTaskActivity.super.onBackPressed();
                             }
                         }).show();
             } else

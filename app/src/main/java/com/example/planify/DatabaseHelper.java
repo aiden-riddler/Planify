@@ -11,8 +11,10 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "learning_schedule.db";
@@ -269,6 +271,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 this.updateSubTask(subTask);
             }
         }
+
         db.close();
         return rowsAffected;
     }
@@ -375,7 +378,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return task;
     }
     @SuppressLint("Range")
-    public String[] getCourses() {
+    public String[] getCourseNames() {
         List<String> courses = new ArrayList<>();
         String selectQuery = "SELECT * FROM " + TABLE_TASKS + " WHERE " + COLUMN_IS_DELETED + " = 0";
         SQLiteDatabase db = this.getReadableDatabase();
@@ -390,6 +393,46 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         cursor.close();
         db.close();
         return courses.toArray(new String[0]);
+    }
+
+    @SuppressLint("Range")
+    public List<Course> getCourses(){
+        List<Course> courses = new ArrayList<>();
+        List<Task> allTasks = getAllTasks();
+        HashMap<String, Course> courseHashMap = new HashMap<>();
+        int i = 0;
+        for (Task task:allTasks){
+            if (courseHashMap.containsKey(task.getCourse())){
+                Course course = courseHashMap.get(task.getCourse());
+                if (i == allTasks.size() - 1)
+                    course.setEndDate(task.getTaskEndTime());
+                course.setSubTasksCount(course.getSubTasksCount() + task.getSubTasks().size());
+                int completeCount = 0;
+                for (SubTask subTask:task.getSubTasks()){
+                    if (subTask.isSubTaskCompleted())
+                        completeCount++;
+                }
+                course.setCompleteSubTasksCount(course.getCompleteSubTasksCount() + completeCount);
+            } else {
+                Course course = new Course();
+                course.setCourseName(task.getCourse());
+                course.setStartDate(task.getTaskStartTime());
+                course.setEndDate(task.getTaskEndTime());
+                course.setSubTasksCount(task.getSubTasks().size());
+                int completeCount = 0;
+                for (SubTask subTask:task.getSubTasks()){
+                    if (subTask.isSubTaskCompleted())
+                        completeCount++;
+                }
+                course.setCompleteSubTasksCount(completeCount);
+                courseHashMap.put(task.getCourse(), course);
+            }
+            i++;
+        }
+
+        for (Map.Entry<String, Course> entry:courseHashMap.entrySet())
+            courses.add(entry.getValue());
+        return courses;
     }
     @SuppressLint("Range")
     public List<Task> getAllTasks() {
@@ -481,6 +524,41 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return tasks;
     }
     @SuppressLint("Range")
+    public List<Task> getTasksAfterDate(long startTime) {
+
+        List<Task> tasks = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        String query = "SELECT * FROM " + TABLE_TASKS + " WHERE " + COLUMN_IS_DELETED + " = 0 AND " +
+                COLUMN_TASK_START_TIME + " >= ? OR " + COLUMN_TASK_END_TIME + " > ? ORDER BY " + COLUMN_TASK_START_TIME;
+
+        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(startTime), String.valueOf(startTime)});
+
+        if (cursor.moveToFirst()) {
+            do {
+                Task task = new Task();
+                int taskId = cursor.getInt(cursor.getColumnIndex(COLUMN_ID));
+                task.setId(taskId);
+                task.setCourse(cursor.getString(cursor.getColumnIndex(COLUMN_COURSE)));
+                task.setTaskName(cursor.getString(cursor.getColumnIndex(COLUMN_TASK_NAME)));
+                task.setTaskStartTime(cursor.getLong(cursor.getColumnIndex(COLUMN_TASK_START_TIME)));
+                task.setTaskEndTime(cursor.getLong(cursor.getColumnIndex(COLUMN_TASK_END_TIME)));
+                task.setCompleted(cursor.getInt(cursor.getColumnIndex(COLUMN_IS_COMPLETED)) == 1);
+                task.setCompletionPercentage(cursor.getDouble(cursor.getColumnIndex(COLUMN_COMPLETION_PERCENTAGE)));
+                task.setDeleted(cursor.getInt(cursor.getColumnIndex(COLUMN_IS_DELETED)) == 1);
+                task.setInUpdate(cursor.getInt(cursor.getColumnIndex(COLUMN_IS_IN_UPDATE)) == 1);
+                task.setSubTasks(this.getAllSubtasksForTask(taskId));
+                tasks.add(task);
+            } while (cursor.moveToNext());
+        }
+
+        cursor.close();
+        db.close();
+
+        return tasks;
+    }
+
+    @SuppressLint("Range")
     public List<Schedule> getAllSchedulesForTask(int taskId) {
         List<Schedule> scheduleList = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
@@ -550,7 +628,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         String[] columns = {
                 COLUMN_NON_SCHEDULABLE_START_TIME,
                 COLUMN_NON_SCHEDULABLE_END_TIME,
-                COLUMN_NON_SCHEDULABLE_DAY
+                COLUMN_NON_SCHEDULABLE_DAY,
+                COLUMN_ID
         };
 
         Cursor cursor = db.query(
@@ -568,7 +647,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 long startTime = cursor.getLong(cursor.getColumnIndex(COLUMN_NON_SCHEDULABLE_START_TIME));
                 long endTime = cursor.getLong(cursor.getColumnIndex(COLUMN_NON_SCHEDULABLE_END_TIME));
                 int day = cursor.getInt(cursor.getColumnIndex(COLUMN_NON_SCHEDULABLE_DAY));
-                int id = cursor.getInt(cursor.getColumnIndex(COLUMN_SUBTASK_ID));
+                int id = cursor.getInt(cursor.getColumnIndex(COLUMN_ID));
 
                 NonScheduleTime nonScheduleTime = new NonScheduleTime();
                 nonScheduleTime.setId(id);
@@ -677,11 +756,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     // schedule new notification
                     String message = "Start task: " + currentUpdateTask.getTaskName();
                     int notId = uniqueNotificationId();
-                    NotificationUtils.scheduleNotification(context, message, (currentUpdateTask.getTaskStartTime() - (10 * 60 * 60)), notId);
+                    NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime(), notId, currentUpdateTask.getCourse());
 
+                    int notId2 = uniqueNotificationId();
                     message = "Upcoming task: " + currentUpdateTask.getTaskName();
-                    NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime(), notId);
+                    NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime() - (10 * 60 * 1000), notId2, currentUpdateTask.getCourse());
 
+                    this.insertSchedule(new Schedule(currentUpdateTask.getId(), notId));
+                    this.insertSchedule(new Schedule(currentUpdateTask.getId(), notId2));
                     isScheduled = true;
                     break;
                 }
@@ -720,10 +802,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 // schedule new notification
                 String message = "Start task: " + currentUpdateTask.getTaskName();
                 int notId = uniqueNotificationId();
-                NotificationUtils.scheduleNotification(context, message, (currentUpdateTask.getTaskStartTime() - (10 * 60 * 60)), notId);
+                NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime(), notId, currentUpdateTask.getCourse());
 
+                int notId2 = uniqueNotificationId();
                 message = "Upcoming task: " + currentUpdateTask.getTaskName();
-                NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime(), notId);
+                NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime() - (10 * 60 * 1000), notId2, currentUpdateTask.getCourse());
+
+                this.insertSchedule(new Schedule(currentUpdateTask.getId(), notId));
+                this.insertSchedule(new Schedule(currentUpdateTask.getId(), notId2));
 
                 Log.d("Planify", "Replaced available task with: " + currentUpdateTask);
 
@@ -805,10 +891,14 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 // schedule new notification
                 String message = "Start task: " + currentUpdateTask.getTaskName();
                 int notId = uniqueNotificationId();
-                NotificationUtils.scheduleNotification(context, message, (currentUpdateTask.getTaskStartTime() - (10 * 60 * 60)), notId);
+                NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime(), notId, currentUpdateTask.getCourse());
 
+                int notId2 = uniqueNotificationId();
                 message = "Upcoming task: " + currentUpdateTask.getTaskName();
-                NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime(), notId);
+                NotificationUtils.scheduleNotification(context, message, currentUpdateTask.getTaskStartTime() - (10 * 60 * 1000), notId2, currentUpdateTask.getCourse());
+
+                this.insertSchedule(new Schedule(currentUpdateTask.getId(), notId));
+                this.insertSchedule(new Schedule(currentUpdateTask.getId(), notId2));
 
                 // reset time conflict
                 nextTask.setInUpdate(false);
@@ -849,15 +939,24 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         NotificationUtils.cancelNotification(context, schedule.getNotificationId());
                         this.deleteSchedule(schedule.getId());
                     }
+                    Log.d("Planify", "Notifications cancelled");
                 }
                 // schedule new notification
                 String message = "Start task: " + task.getTaskName();
                 int notId = uniqueNotificationId();
-                NotificationUtils.scheduleNotification(context, message, (task.getTaskStartTime() - (10 * 60 * 60)), notId);
+                NotificationUtils.scheduleNotification(context, message, task.getTaskStartTime(), notId, task.getCourse());
 
                 message = "Upcoming task: " + task.getTaskName();
-                NotificationUtils.scheduleNotification(context, message, task.getTaskStartTime(), notId);
+                int notId2 = uniqueNotificationId();
+                long newTime = task.getTaskStartTime() - (10 * 60 * 1000);
+                NotificationUtils.scheduleNotification(context, message, newTime, notId2, task.getCourse());
                 previousEndTime = task.getTaskEndTime();
+
+                this.insertSchedule(new Schedule(task.getId(), notId));
+                this.insertSchedule(new Schedule(task.getId(), notId2));
+
+                Log.d("Planify", "New Start Time: " + NotificationUtils.formatTime(task.getTaskStartTime()));
+                Log.d("Planify", "New Previous Start Time: " + NotificationUtils.formatTime(newTime));
                 // create notification
 
             }
@@ -887,8 +986,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             subTasks.add(subtask);
             task.setSubTasks(subTasks);
             this.insertTask(task);
-            // delete previous subtask
-//            this.deleteSubtask(subtask.getId(), parentTask.getId());
+
+            // schedule new notification
+            String message = "Start task: " + task.getTaskName();
+            int notId = uniqueNotificationId();
+            NotificationUtils.scheduleNotification(context, message, task.getTaskStartTime(), notId, task.getCourse());
+
+            int notId2 = uniqueNotificationId();
+            message = "Upcoming task: " + task.getTaskName();
+            NotificationUtils.scheduleNotification(context, message, task.getTaskStartTime() - (10 * 60 * 1000), notId2, task.getCourse());
+
+            this.insertSchedule(new Schedule(task.getId(), notId));
+            this.insertSchedule(new Schedule(task.getId(), notId2));
         } else {
             // Step 4: Check and Adjust Subtask Times
             SubTask currentSubTask = subtask;
@@ -900,8 +1009,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 firstTask.setDeleted(true);
                 // disable notifications
                 List<Schedule> schedulesForTask = this.getAllSchedulesForTask(firstTask.getId());
-                for (Schedule schedule:schedulesForTask)
-                    NotificationUtils.cancelNotification(context, schedule.getId());
+                for (Schedule schedule:schedulesForTask){
+                    NotificationUtils.cancelNotification(context, schedule.getNotificationId());
+                }
             }
             this.updateTask(firstTask);
 
@@ -939,8 +1049,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                         nextTask.setDeleted(true);
                         // disable notifications
                         List<Schedule> schedulesForTask = this.getAllSchedulesForTask(nextTask.getId());
-                        for (Schedule schedule:schedulesForTask)
-                            NotificationUtils.cancelNotification(context, schedule.getId());
+                        for (Schedule schedule:schedulesForTask) {
+                            NotificationUtils.cancelNotification(context, schedule.getNotificationId());
+                        }
                     }
                     this.updateTask(nextTask);
                     Log.d("Planify", "Updated task: " + nextTask);
@@ -958,6 +1069,18 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 subtask.setPosition(1);
                 task.setSubTasks(subTasks);
                 this.insertTask(task);
+
+                // schedule new notification
+                String message = "Start task: " + task.getTaskName();
+                int notId = uniqueNotificationId();
+                NotificationUtils.scheduleNotification(context, message, task.getTaskStartTime(), notId, task.getCourse());
+
+                int notId2 = uniqueNotificationId();
+                message = "Upcoming task: " + task.getTaskName();
+                NotificationUtils.scheduleNotification(context, message, task.getTaskStartTime() - (10 * 60 * 1000), notId2, task.getCourse());
+
+                this.insertSchedule(new Schedule(task.getId(), notId));
+                this.insertSchedule(new Schedule(task.getId(), notId2));
             }
         }
     }
@@ -1076,8 +1199,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return (int) (System.currentTimeMillis() % Integer.MAX_VALUE);
     }
     public boolean hasNonSchedulableHourConflict(long startTime, long endTime) {
-
-        boolean conflict = false;
         ArrayList<NonScheduleTime> nonSchedulableHours = this.getNonSchedulableHours();
         for (NonScheduleTime nonScheduleTime:nonSchedulableHours){
 
@@ -1088,10 +1209,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int startMin = c1.get(Calendar.MINUTE);
             int startDay = c1.get(Calendar.DAY_OF_WEEK);
 
-            c1.setTimeInMillis(startTime);
+            c1 = Calendar.getInstance();
+            c1.set(Calendar.DAY_OF_WEEK, startDay);
             c1.set(Calendar.HOUR_OF_DAY, startHour);
             c1.set(Calendar.MINUTE, startMin);
-            c1.set(Calendar.SECOND, 0);
+            c1.set(Calendar.SECOND,0);
             c1.set(Calendar.MILLISECOND, 0);
 
             //END HOUR
@@ -1101,30 +1223,129 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             int endMin = c2.get(Calendar.MINUTE);
             int endDay = c2.get(Calendar.DAY_OF_WEEK);
 
-            c2.setTimeInMillis(endTime);
+            c2 = Calendar.getInstance();
+            c2.set(Calendar.DAY_OF_WEEK, endDay);
             c2.set(Calendar.HOUR_OF_DAY, endHour);
             c2.set(Calendar.MINUTE, endMin);
-            c2.set(Calendar.SECOND, 59);
+            c2.set(Calendar.SECOND,59);
             c2.set(Calendar.MILLISECOND, 999);
 
-            // cehck start time
+            // check start time
             Calendar c3 = Calendar.getInstance();
             c3.setTimeInMillis(startTime);
-            int startDayOfWeek = c3.get(Calendar.DAY_OF_WEEK);
+            int startTimeDay = c3.get(Calendar.DAY_OF_WEEK);
+            int startTimeHr = c3.get(Calendar.HOUR_OF_DAY);
+            int startTimeMin = c3.get(Calendar.MINUTE);
 
-            if (startDayOfWeek >= startDay && startDayOfWeek <= endDay){
-                if (c3.getTimeInMillis() >= c1.getTimeInMillis() && c3.getTimeInMillis() <= c2.getTimeInMillis())
-                    conflict = true;
+            c3 = Calendar.getInstance();
+            c3.set(Calendar.DAY_OF_WEEK, startTimeDay);
+            c3.set(Calendar.HOUR_OF_DAY, startTimeHr);
+            c3.set(Calendar.MINUTE, startTimeMin);
+            c3.set(Calendar.SECOND,0);
+            c3.set(Calendar.MILLISECOND, 0);
 
-                c3.setTimeInMillis(endTime);
-                if (c3.getTimeInMillis() >= c1.getTimeInMillis() && c3.getTimeInMillis() <= c2.getTimeInMillis())
-                    conflict = true;
-            }
+            if (c3.getTimeInMillis() >= c1.getTimeInMillis() && c3.getTimeInMillis() <= c2.getTimeInMillis())
+                return true;
+
+
+            // check endtime
+            Calendar c4 = Calendar.getInstance();
+            c4.setTimeInMillis(endTime);
+            int endTimeDay = c4.get(Calendar.DAY_OF_WEEK);
+            int endTimeHr = c4.get(Calendar.HOUR_OF_DAY);
+            int endTimeMin = c4.get(Calendar.MINUTE);
+
+            c4 = Calendar.getInstance();
+            c4.set(Calendar.DAY_OF_WEEK, endTimeDay);
+            c4.set(Calendar.HOUR_OF_DAY, endTimeHr);
+            c4.set(Calendar.MINUTE, endTimeMin);
+            c4.set(Calendar.SECOND,0);
+            c4.set(Calendar.MILLISECOND, 0);
+
+            if (c4.getTimeInMillis() >= c1.getTimeInMillis() && c4.getTimeInMillis() <= c2.getTimeInMillis())
+                return true;
 
         }
-        return conflict;
+        return false;
     }
 
+    // CLEAR TIME
+    public void clearMyDays(long startTime,  long endTime){
+        List<Task> tasksToReschedule = this.getTasksBetween(startTime, endTime);
+        long timeRequired = 5L * 60 * 1000 * tasksToReschedule.size();
+        for (Task task:tasksToReschedule) {
+            timeRequired += task.getTaskEndTime() - task.getTaskStartTime();
+            task.setInUpdate(true);
+            this.updateTask(task);
+        }
+
+        List<Task> tasksAfterDate = this.getTasksAfterDate(endTime);
+        long previousTime = endTime;
+        int count = 0;
+        while (timeRequired > 0 && count < tasksAfterDate.size()){
+            Task task = tasksAfterDate.get(count);
+            if (task.getTaskStartTime() > previousTime){
+                long temp = timeRequired;
+                long freeTime = task.getTaskStartTime() - previousTime;
+                timeRequired -= freeTime;
+                if (timeRequired <= 0) {
+                    previousTime = previousTime + temp;
+                    break;
+                }
+            }
+            previousTime = task.getTaskEndTime();
+            task.setInUpdate(true);
+            this.updateTask(task);
+            tasksToReschedule.add(task);
+            count++;
+        }
+
+        long taskStartTime = endTime;
+        for (Task task:tasksToReschedule){
+            task.setDuration(task.getTaskEndTime() - task.getTaskStartTime());
+            task.setTaskStartTime(taskStartTime);
+            task.setTaskEndTime(taskStartTime + task.getDuration());
+            task.setInUpdate(false);
+            this.updateTask(task);
+            taskStartTime = task.getTaskEndTime() + (5L * 60 * 1000);
+        }
+    }
+
+    @SuppressLint("Range")
+    private List<Task> getTasksBetween(long startTime, long endTime) {
+        List<Task> tasks = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        String query = "SELECT * FROM " + TABLE_TASKS + " WHERE " + COLUMN_IS_DELETED + " = 0 AND " +
+                COLUMN_TASK_START_TIME + " >= ? AND " + COLUMN_TASK_START_TIME + " < ? ORDER BY " + COLUMN_TASK_START_TIME;
+
+        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(startTime), String.valueOf(endTime)});
+
+        if (cursor.moveToFirst()) {
+            do {
+                Task task = new Task();
+                int taskId = cursor.getInt(cursor.getColumnIndex(COLUMN_ID));
+                task.setId(taskId);
+                task.setCourse(cursor.getString(cursor.getColumnIndex(COLUMN_COURSE)));
+                task.setTaskName(cursor.getString(cursor.getColumnIndex(COLUMN_TASK_NAME)));
+                task.setTaskStartTime(cursor.getLong(cursor.getColumnIndex(COLUMN_TASK_START_TIME)));
+                task.setTaskEndTime(cursor.getLong(cursor.getColumnIndex(COLUMN_TASK_END_TIME)));
+                task.setCompleted(cursor.getInt(cursor.getColumnIndex(COLUMN_IS_COMPLETED)) == 1);
+                task.setCompletionPercentage(cursor.getDouble(cursor.getColumnIndex(COLUMN_COMPLETION_PERCENTAGE)));
+                task.setDeleted(cursor.getInt(cursor.getColumnIndex(COLUMN_IS_DELETED)) == 1);
+                task.setInUpdate(cursor.getInt(cursor.getColumnIndex(COLUMN_IS_IN_UPDATE)) == 1);
+                task.setSubTasks(this.getAllSubtasksForTask(taskId));
+                tasks.add(task);
+
+
+            } while (cursor.moveToNext());
+        }
+
+        cursor.close();
+        db.close();
+
+        return tasks;
+    }
 
 }
 

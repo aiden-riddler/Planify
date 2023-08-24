@@ -99,7 +99,7 @@ public class SubTaskAdapter extends RecyclerView.Adapter<SubTaskAdapter.SubTaskV
                         .setTitle("Mark Complete")
                         .setMessage("This task will be marked " + (subTask.isSubTaskCompleted() ? "complete." : "incomplete"))
                         .setView(dialogView)
-                        .setPositiveButton((subTask.isSubTaskCompleted() ? "MARK INCOMPLETE" : "MARK COMPLETE"), (dialog, which) -> {
+                        .setPositiveButton((subTask.isSubTaskCompleted() ? "MARK COMPLETE" : "MARK INCOMPLETE"), (dialog, which) -> {
                             // Handle positive button click
                             db.updateSubTask(subTask);
                             // notify change

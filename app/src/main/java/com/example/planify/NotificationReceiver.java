@@ -16,10 +16,11 @@ public class NotificationReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         String message = intent.getStringExtra("message");
         int notId = intent.getIntExtra("notificationID", 0);
-        showNotification(context, message, notId);
+        String courseName = intent.getStringExtra("course");
+        showNotification(context, message, notId, courseName);
     }
 
-    private void showNotification(Context context, String message, int notId) {
+    private void showNotification(Context context, String message, int notId, String course) {
         Intent notificationIntent = new Intent(context, MainActivity.class);
         PendingIntent contentIntent = PendingIntent.getActivity(
                 context,
@@ -30,7 +31,9 @@ public class NotificationReceiver extends BroadcastReceiver {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, App.CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notifications_black_24dp)
-                .setContentTitle("Learning Schedule")
+                .setContentTitle(course)
+                .setGroup(course)
+                .setGroupSummary(true)
                 .setContentText(message)
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true);
@@ -50,5 +53,6 @@ public class NotificationReceiver extends BroadcastReceiver {
         }
         notificationManager.notify(notId, builder.build());
     }
+
 }
 

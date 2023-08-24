@@ -60,8 +60,8 @@ public class NonSchedulerAdapter extends RecyclerView.Adapter<NonSchedulerAdapte
     @Override
     public void onBindViewHolder(@NonNull TaskViewHolder holder, @SuppressLint("RecyclerView") int position) {
         NonScheduleTime nonScheduleTime = nonScheduleTimes.get(position);
-        holder.dayView.setText(getDayOfWeekFromDate(nonScheduleTime.getDay()));
-        String time = formatTime(nonScheduleTime.getStartTime()) + "-" + formatTime(nonScheduleTime.getEndtime());
+        holder.dayView.setText(formatDayOfWeek(nonScheduleTime.getDay()));
+        String time = formatTime(nonScheduleTime.getStartTime()) + " -> " + formatTime(nonScheduleTime.getEndtime());
         holder.timeView.setText(time);
     }
 
@@ -73,26 +73,24 @@ public class NonSchedulerAdapter extends RecyclerView.Adapter<NonSchedulerAdapte
     // Format time to HH:mm AM/PM
     private String formatTime(long timeInMillis) {
         // Format the time using SimpleDateFormat or any other method you prefer
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm a", Locale.getDefault());
+        SimpleDateFormat sdf = new SimpleDateFormat("E, hh:mm a", Locale.getDefault());
         return sdf.format(timeInMillis);
     }
 
-    public String getDayOfWeekFromDate(int dayOfWeekValue) {
-
-        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE", Locale.getDefault());
-
-        // Get the day name based on the day of the week value
-        Date date = new Date();
-        date.setDate(dayOfWeekValue); // Set the date to the day of the week value
-        String dayOfWeek = dateFormat.format(date);
-
-        return dayOfWeek;
+    public String formatDayOfWeek(int dayOfWeekValue) {
+        String[] daysOfWeek = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+        if (dayOfWeekValue >= 1 && dayOfWeekValue <= 7) {
+            return daysOfWeek[dayOfWeekValue - 1];
+        } else {
+            return "Unknown Day";
+        }
     }
+
 
     class TaskViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener{
         TextView dayView;
         TextView timeView;
-        Button delete;
+        ImageButton delete;
 
         TaskViewHolder(View itemView) {
             super(itemView);
@@ -106,7 +104,7 @@ public class NonSchedulerAdapter extends RecyclerView.Adapter<NonSchedulerAdapte
         public void onClick(View view) {
             DatabaseHelper db = new DatabaseHelper(context);
             NonScheduleTime nonScheduleTime = nonScheduleTimes.get(getAdapterPosition());
-            String time = formatTime(nonScheduleTime.getStartTime()) + "-" + formatTime(nonScheduleTime.getEndtime());
+            String time = formatTime(nonScheduleTime.getStartTime()) + " -> " + formatTime(nonScheduleTime.getEndtime());
             if (view.getId() == delete.getId()){
                 // delete
                 new MaterialAlertDialogBuilder(context)
